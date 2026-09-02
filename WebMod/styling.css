@@ -1,0 +1,227 @@
+/* Undead Legacy Dashboard Panels - minimal styling, layout/visuals deferred (design doc §9 step 5). */
+table {
+	border-collapse: collapse;
+	width: 100%;
+	margin-top: 1rem;
+}
+th,
+td {
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	padding: 0.4rem 0.6rem;
+	text-align: left;
+}
+
+/* Visual language (design discussion): excluded row = offline (never rendered at all);
+   greyed row = online but doesn't match the active search chip; normal = matches, or no
+   search active. */
+.ul-row-nomatch {
+	opacity: 0.35;
+	filter: grayscale(1);
+}
+.ul-row-match {
+	background: rgba(80, 200, 120, 0.12);
+}
+
+.ul-search-input {
+	font-size: 1rem;
+	padding: 0.4rem 0.6rem;
+	min-width: 320px;
+}
+
+.ul-search-error {
+	color: #f55;
+	margin-top: 0.3rem;
+	font-size: 0.85rem;
+}
+
+.ul-no-match-notice {
+	color: #ccc;
+	font-style: italic;
+}
+
+.ul-search-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	background: rgba(255, 255, 255, 0.1);
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 999px;
+	padding: 0.3rem 0.5rem 0.3rem 0.9rem;
+	font-size: 0.95rem;
+}
+.ul-chip-clear {
+	background: none;
+	border: none;
+	color: inherit;
+	cursor: pointer;
+	font-size: 1.1rem;
+	line-height: 1;
+	padding: 0 0.3rem;
+}
+.ul-chip-clear:hover {
+	color: #f55;
+}
+
+.ul-favored-first {
+	font-weight: bold;
+}
+.ul-favored-second {
+	opacity: 0.8;
+}
+.ul-favored-empty {
+	opacity: 0.4;
+}
+
+.ul-map-widget-column {
+	flex: 0 0 260px;
+	max-height: 80vh;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+.ul-map-widget {
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 4px;
+}
+.ul-map-widget-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0.4rem 0.6rem;
+	cursor: pointer;
+	background: rgba(255, 255, 255, 0.05);
+}
+.ul-map-widget-header:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+.ul-map-widget-header h2 {
+	margin: 0;
+	font-size: 1rem;
+}
+.ul-map-widget-toggle {
+	opacity: 0.7;
+}
+.ul-map-widget-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+.ul-map-widget-row {
+	padding: 0.5rem 0.6rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+	cursor: pointer;
+}
+.ul-map-widget-row:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+.ul-map-widget-row-disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+.ul-map-widget-row-disabled:hover {
+	background: none;
+}
+
+.ul-map-widget-search {
+	display: block;
+	box-sizing: border-box;
+	font-size: 0.9rem;
+	padding: 0.35rem 0.5rem;
+	margin: 0.5rem 0.6rem 0;
+	width: calc(100% - 1.2rem);
+}
+
+/* Colored swatch next to each marker's name/owner in the widget list - same palette as the
+   ring drawn around its map pin (see buildOwnerColorMap in bundle.js), so a marker can be
+   traced between the list and the map at a glance. */
+.ul-map-marker-swatch {
+	display: inline-block;
+	width: 0.7rem;
+	height: 0.7rem;
+	border-radius: 50%;
+	margin-right: 0.5rem;
+	vertical-align: middle;
+}
+
+/* Map pin: real in-game icon sprite (/ulmapicons/<icon>.png) inside a colored ring identifying
+   the marker's owner (design ask: disambiguate same-icon/same-name markers from different
+   players). */
+.ul-map-marker-icon {
+	background: none;
+	border: none;
+}
+.ul-map-marker-ring {
+	width: 34px;
+	height: 34px;
+	box-sizing: border-box;
+	border: 3px solid #888;
+	border-radius: 50%;
+	background: rgba(20, 20, 20, 0.85);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.ul-map-marker-ring img {
+	width: 22px;
+	height: 22px;
+}
+
+/* Starting-class icon (design ask: replace the "Class" text column/label with the real in-game
+   class badge - see CLASS_ICON_MAP in bundle.js - plus a native title tooltip, so both the
+   Player List table and the map's player widget read more compactly). The badge art is already
+   a complete gold laurel-wreath icon on a transparent background, so it's shown as-is - no extra
+   ring/frame needed the way the shared-marker pins (a plain in-game icon with no framing of its
+   own) need one. Sized a bit larger than a typical inline icon since the badges are intricate
+   (crossed rifles, a heartbeat line, etc.) and turn to mush much below this. */
+.ul-class-cell {
+	text-align: center;
+	width: 2.4rem;
+}
+.ul-class-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	vertical-align: middle;
+}
+.ul-class-icon img {
+	width: 1.8rem;
+	height: 1.8rem;
+}
+.ul-class-icon-empty {
+	opacity: 0.4;
+}
+
+/* Sidebar icon swap (design ask). The dashboard's own sidebar (components/sidebar/index.js,
+   recovered source) hardcodes <FaFlask/> for every mod route with no per-route icon prop in the
+   plugin contract - mod.external.routes only carries {path, name, element} (lib/mods.js). That's
+   baked into the host's compiled bundle, which we deliberately never touch (design doc: keep
+   this mod's redistributable fully self-contained, no dependency on/edits to other mods' files).
+   Our own styling.css, though, is injected as a normal global <link> by the host itself
+   (useExternalScripts.js appends it to document.head) - so a same-page CSS override is fully
+   within our own file, not a host patch. Each SidebarNavLink's react-tooltip anchor carries
+   data-for="tooltip-<title>" where title is our own route name (PlayerList/ULMap, chosen when
+   registering window.UndeadLegacyPanels.routes below) - a stable, collision-free hook. */
+a[data-for='tooltip-PlayerList'] svg,
+a[data-for='tooltip-ULMap'] svg {
+	display: none;
+}
+a[data-for='tooltip-PlayerList']::before,
+a[data-for='tooltip-ULMap']::before {
+	content: '';
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	margin: 0 0.5rem;
+	background-size: contain;
+	background-repeat: no-repeat;
+	background-position: center;
+	vertical-align: middle;
+}
+a[data-for='tooltip-PlayerList']::before {
+	background-image: url('/ulmapicons/symbol_players.png');
+}
+a[data-for='tooltip-ULMap']::before {
+	background-image: url('/ulmapicons/symbol_map_waypoint.png');
+}

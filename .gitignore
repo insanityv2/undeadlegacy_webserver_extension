@@ -1,0 +1,9 @@
+bin/
+obj/
+
+# Local dev-only preview harness - hardcodes a throwaway local API token and references
+# stale route names, never meant to ship with the mod.
+preview.html
+
+*.user
+.vs/
