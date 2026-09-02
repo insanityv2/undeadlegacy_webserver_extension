@@ -717,9 +717,11 @@
 					iconAnchor: [17, 17],
 					popupAnchor: [0, -17],
 				});
+				// A null owner is a game-generated marker (e.g. a discovered trader) - saying
+				// "Placed by unknown" for those is just wrong, so omit the byline.
 				L.marker([m.position.x, m.position.z], { icon: icon })
 					.addTo(markersLayerRef.current)
-					.bindPopup(m.name + '<br/>Placed by ' + (m.owner || 'unknown'));
+					.bindPopup(m.owner ? m.name + '<br/>Placed by ' + m.owner : m.name);
 			});
 		}, [widgetMarkers, mapReady]);
 
@@ -895,7 +897,7 @@
 					className: 'ul-map-marker-swatch',
 					style: { background: color },
 				}),
-				m.name + ' — ' + (m.owner || 'unknown')
+				m.owner ? m.name + ' — ' + m.owner : m.name
 			);
 		});
 

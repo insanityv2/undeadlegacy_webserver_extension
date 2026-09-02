@@ -50,8 +50,18 @@ namespace UndeadLegacyPanels.Api
 				displayNameByOwnerKey[kp.FileBaseName] = kp.DisplayName;
 			}
 
-			var seen = new HashSet<string>();
-			var markers = new List<(MarkerData marker, string ownerKey)>();
+			// Identical markers (same name, icon, and position) commonly exist in several saves
+			// at once: the game auto-adds e.g. a trader's location marker to every player who has
+			// discovered it, and an accepted waypoint invite copies the marker into the accepting
+			// player's save. Group by (name, icon, position) across all saves, then attribute each
+			// group once:
+			//   - a copy carrying an explicit ownerId (only invite-copies do) names the true owner;
+			//   - a group found in exactly one save belongs to that save's player (a player's own
+			//     markers carry no ownerId - confirmed live, see below);
+			//   - a group in multiple saves with no explicit owner anywhere is game-generated
+			//     (trader discovery) - no meaningful owner, listed once with owner null.
+			var groupOrder = new List<string>();
+			var groups = new Dictionary<string, (MarkerData marker, string explicitOwnerKey, List<string> sourcePlayers)>();
 
 			foreach (KnownPlayer kp in players)
 			{
@@ -61,20 +71,32 @@ namespace UndeadLegacyPanels.Api
 
 				foreach (MarkerData marker in save.Markers)
 				{
-					// A player's own markers carry no ownerId in their own save (confirmed live:
-					// every marker on a real server came back owner-less) - ownerId is only set on
-					// copies received via a waypoint invite. So a null OwnerKey means "owned by the
-					// player whose save this is": attribute it to the save it came from instead of
-					// falling into an "unknown" bucket that collapses the per-owner coloring.
-					string ownerKey = marker.OwnerKey ?? kp.FileBaseName;
-					string dedupeKey = ownerKey + "|" + marker.X + "," + marker.Y + "," + marker.Z + "|" + marker.RawName;
-					if (!seen.Add(dedupeKey))
+					string groupKey = marker.RawName + "|" + marker.Icon + "|" + marker.X + "," + marker.Y + "," + marker.Z;
+					if (!groups.TryGetValue(groupKey, out var group))
 					{
-						continue;
+						group = (marker, null, new List<string>());
+						groupOrder.Add(groupKey);
 					}
-
-					markers.Add((marker, ownerKey));
+					if (marker.OwnerKey != null)
+					{
+						// An explicit ownerId (invite-copy) is authoritative for the whole group.
+						group.explicitOwnerKey = marker.OwnerKey;
+					}
+					else if (!group.sourcePlayers.Contains(kp.FileBaseName))
+					{
+						group.sourcePlayers.Add(kp.FileBaseName);
+					}
+					groups[groupKey] = group;
 				}
+			}
+
+			var markers = new List<(MarkerData marker, string ownerKey)>();
+			foreach (string groupKey in groupOrder)
+			{
+				var group = groups[groupKey];
+				string ownerKey = group.explicitOwnerKey
+					?? (group.sourcePlayers.Count == 1 ? group.sourcePlayers[0] : null);
+				markers.Add((group.marker, ownerKey));
 			}
 
 			JsonWriter writer;
@@ -109,7 +131,10 @@ namespace UndeadLegacyPanels.Api
 				writer.WriteString(marker.Icon);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("owner");
-				if (!displayNameByOwnerKey.TryGetValue(ownerKey, out string ownerDisplayName))
+				// ownerKey null = game-generated marker present in several saves - owner is null in
+				// the response (the frontend already renders that as its neutral/unowned style).
+				string ownerDisplayName = null;
+				if (ownerKey != null && !displayNameByOwnerKey.TryGetValue(ownerKey, out ownerDisplayName))
 				{
 					// A marker copied from a player we have no save/players.xml entry for -
 					// show the raw key rather than nothing.
