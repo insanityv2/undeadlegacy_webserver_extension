@@ -51,7 +51,7 @@ namespace UndeadLegacyPanels.Api
 				}
 				firstPlayer = false;
 
-				PlayerSaveData save = PlayerSaveReader.Load(playerDir, kp.FileBaseName);
+				PlayerSaveData save = PlayerSaveCache.Get(playerDir, kp.FileBaseName);
 
 				string playerClass = null;
 				foreach (var kv in SkillTreeConstants.ClassDisplayNames)

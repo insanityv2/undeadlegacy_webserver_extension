@@ -51,46 +51,29 @@ namespace UndeadLegacyPanels.Api
 			}
 
 			var seen = new HashSet<string>();
-			var markers = new List<(Waypoint wp, string ownerKey)>();
+			var markers = new List<(MarkerData marker, string ownerKey)>();
 
 			foreach (KnownPlayer kp in players)
 			{
-				PlayerDataFile file = new PlayerDataFile();
-				try
-				{
-					file.Load(playerDir, kp.FileBaseName);
-				}
-				catch (System.Exception ex)
-				{
-					Log.Warning("[UndeadLegacyPanels] SharedMarkers load failed for " + kp.FileBaseName + ": " + ex.Message);
-					continue;
-				}
+				// Cached, and pre-filtered to manually-placed markers - see
+				// PlayerSaveReader's extraction and PlayerSaveCache.
+				PlayerSaveData save = PlayerSaveCache.Get(playerDir, kp.FileBaseName);
 
-				if (file.waypoints == null)
+				foreach (MarkerData marker in save.Markers)
 				{
-					continue;
-				}
-
-				foreach (Waypoint wp in file.waypoints.Collection.list)
-				{
-					if (wp.lastKnownPositionEntityId != -1)
-					{
-						continue; // auto-tracked (vehicle/drone) - owner-only, not shared
-					}
-
 					// A player's own markers carry no ownerId in their own save (confirmed live:
 					// every marker on a real server came back owner-less) - ownerId is only set on
-					// copies received via a waypoint invite. So a null ownerId means "owned by the
+					// copies received via a waypoint invite. So a null OwnerKey means "owned by the
 					// player whose save this is": attribute it to the save it came from instead of
 					// falling into an "unknown" bucket that collapses the per-owner coloring.
-					string ownerKey = wp.ownerId != null ? wp.ownerId.CombinedString : kp.FileBaseName;
-					string dedupeKey = ownerKey + "|" + wp.pos.x + "," + wp.pos.y + "," + wp.pos.z + "|" + (wp.name != null ? wp.name.Text : "");
+					string ownerKey = marker.OwnerKey ?? kp.FileBaseName;
+					string dedupeKey = ownerKey + "|" + marker.X + "," + marker.Y + "," + marker.Z + "|" + marker.RawName;
 					if (!seen.Add(dedupeKey))
 					{
 						continue;
 					}
 
-					markers.Add((wp, ownerKey));
+					markers.Add((marker, ownerKey));
 				}
 			}
 
@@ -101,7 +84,7 @@ namespace UndeadLegacyPanels.Api
 			writer.WriteBeginArray();
 
 			bool first = true;
-			foreach ((Waypoint wp, string ownerKey) in markers)
+			foreach ((MarkerData marker, string ownerKey) in markers)
 			{
 				if (!first)
 				{
@@ -109,9 +92,11 @@ namespace UndeadLegacyPanels.Api
 				}
 				first = false;
 
-				string name = wp.name != null ? wp.name.Text : "";
-				// bUsingLocalizationId means Text is a localization key, not literal display text.
-				if (wp.bUsingLocalizationId && !string.IsNullOrEmpty(name))
+				string name = marker.RawName;
+				// NameIsLocalizationId means RawName is a localization key, not literal display
+				// text. Resolved here at response time, not at extraction, so cached entries
+				// never bake in localization state.
+				if (marker.NameIsLocalizationId && !string.IsNullOrEmpty(name))
 				{
 					name = Localization.Get(name, false);
 				}
@@ -121,27 +106,27 @@ namespace UndeadLegacyPanels.Api
 				writer.WriteString(string.IsNullOrEmpty(name) ? "(unnamed marker)" : name);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("icon");
-				writer.WriteString(wp.icon);
+				writer.WriteString(marker.Icon);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("owner");
 				if (!displayNameByOwnerKey.TryGetValue(ownerKey, out string ownerDisplayName))
 				{
 					// A marker copied from a player we have no save/players.xml entry for -
-					// show the raw readable id rather than nothing.
-					ownerDisplayName = wp.ownerId != null ? wp.ownerId.ReadablePlatformUserIdentifier : ownerKey;
+					// show the raw key rather than nothing.
+					ownerDisplayName = ownerKey;
 				}
 				writer.WriteString(ownerDisplayName);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("position");
 				writer.WriteBeginObject();
 				writer.WritePropertyName("x");
-				writer.WriteInt32(wp.pos.x);
+				writer.WriteInt32(marker.X);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("y");
-				writer.WriteInt32(wp.pos.y);
+				writer.WriteInt32(marker.Y);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("z");
-				writer.WriteInt32(wp.pos.z);
+				writer.WriteInt32(marker.Z);
 				writer.WriteEndObject();
 				writer.WriteEndObject();
 			}
