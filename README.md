@@ -1,5 +1,7 @@
 # Undead Legacy Dashboard Panels
 
+**Current release: [v1.0.0](releases/UndeadLegacyPanels-v1.0.0.zip)**
+
 A self-contained add-on for the stock 7 Days to Die dedicated server web dashboard
 (`TFP_WebServer`), purpose-built for **Undead Legacy** (UL) servers. It adds two panels -
 a **Player List** and a **UL Map** - that surface UL-specific character and world data the
@@ -76,9 +78,10 @@ piece - please open an issue with the version number.
 
 ## Installation
 
-1. Build the mod (see below) or grab a built release.
-2. Copy the whole `UndeadLegacyPanels` folder into the server's `Mods/` directory, alongside
-   `TFP_WebServer` and `UndeadLegacy`.
+1. Download the [latest release zip](releases/UndeadLegacyPanels-v1.0.0.zip) (or build from
+   source - see below).
+2. Extract it, then copy the `UndeadLegacyPanels` folder it contains into the server's `Mods/`
+   directory, alongside `TFP_WebServer` and `UndeadLegacy`.
 3. Restart the server. Look for `Loaded Mod: UndeadLegacyPanels` in the log.
 4. Open the dashboard - "Player List" and "UL Map" appear in the sidebar for any logged-in user.
 
@@ -87,12 +90,21 @@ No `serveradmin.xml` changes are needed; if you want to restrict either panel fu
 on the `web.ulmap`, `web.ulmapicons`, `web.ulskillicons`, `webapi.researchoverlap`,
 `webapi.buildcoordination`, and `webapi.sharedmarkers` modules.
 
+## Project layout
+
+- **`development/`** - the actual source: the C# project (`UndeadLegacyPanels.csproj`, `*.cs`,
+  `Api/`) and the frontend (`WebMod/`), plus `ModInfo.xml`. Build here.
+- **`releases/`** - ready-to-install zips built from `development/`. Each one extracts straight
+  to a `UndeadLegacyPanels` folder containing exactly what belongs in `Mods/` - the compiled
+  DLL, `ModInfo.xml`, and `WebMod/` - no source, no build files.
+
 ## Building from source
 
 Requires the .NET SDK (net48 target) and a local copy of the game (for reference assemblies -
 none are redistributed here).
 
 ```
+cd development
 dotnet build
 ```
 
@@ -103,18 +115,19 @@ with:
 dotnet build /p:GameInstallDir="D:\some\other\path"
 ```
 
-The build output (`bin/UndeadLegacyPanels.dll`) plus the `WebMod/` folder and `ModInfo.xml`
-together make up the deployable mod.
+The build output (`development/bin/UndeadLegacyPanels.dll`) plus `development/WebMod/` and
+`development/ModInfo.xml` together make up the deployable mod - the same three things each
+release zip packages up.
 
 ## How it works, briefly
 
-- **Backend** (`Api/`, C#): reads player save files and UL's own config XML directly (no
-  dependency on UL's assemblies), computes talent/research/recipe unlock state, and exposes it
-  as JSON over new REST endpoints, auto-discovered by the stock web server the same way its own
-  built-in endpoints are.
-- **Frontend** (`WebMod/bundle.js`): a plain script (no build step, no bundler) that registers
-  React components under `window.UndeadLegacyPanels`, following the same plugin contract the
-  stock dashboard already uses for other web mods.
+- **Backend** (`development/Api/`, C#): reads player save files and UL's own config XML directly
+  (no dependency on UL's assemblies), computes talent/research/recipe unlock state, and exposes
+  it as JSON over new REST endpoints, auto-discovered by the stock web server the same way its
+  own built-in endpoints are.
+- **Frontend** (`development/WebMod/bundle.js`): a plain script (no build step, no bundler) that
+  registers React components under `window.UndeadLegacyPanels`, following the same plugin
+  contract the stock dashboard already uses for other web mods.
 - **Static assets**: map tiles and Undead Legacy's own UI icon sprites are served from this mod's
   own routes, reading files that `TFP_MapRendering`/`UndeadLegacy` already write to disk - no
   copies, no repacking.

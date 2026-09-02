@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<xml>
-	<Name value="UndeadLegacyPanels" />
-	<DisplayName value="Undead Legacy Dashboard Panels" />
-	<Description value="Adds Research/Recipe Overlap and Build Coordination panels to the Web Dashboard for Undead Legacy servers" />
-	<Author value="" />
-	<Version value="0.1.0.0" />
-	<Website value="" />
-</xml>
