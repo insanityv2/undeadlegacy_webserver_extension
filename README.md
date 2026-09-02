@@ -1,6 +1,6 @@
 # Undead Legacy Dashboard Panels for UL 2.7+
 
-**Current panel extension release: [v1.0.1](releases/UndeadLegacyPanels-v1.0.1.zip)**
+**Current panel extension release: [v1.1.0](releases/UndeadLegacyPanels-v1.1.0.zip)**
 
 **[Subquake's Undead Legacy Total Overhaul Mod for 7D2D](https://ul.subquake.com/)**
 
@@ -83,7 +83,7 @@ please open an issue with the version number.
 
 ## Installation
 
-1. Download the [latest release zip](releases/UndeadLegacyPanels-v1.0.1.zip) (or build from
+1. Download the [latest release zip](releases/UndeadLegacyPanels-v1.1.0.zip) (or build from
    source - see below).
 2. Extract it, then copy the `UndeadLegacyPanels` folder it contains into the server's `Mods/`
    directory, alongside `TFP_WebServer` and `UndeadLegacy`.
