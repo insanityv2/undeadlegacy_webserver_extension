@@ -1,6 +1,8 @@
-# Undead Legacy Dashboard Panels
+# Undead Legacy Dashboard Panels for UL 2.7+
 
-**Current release: [v1.0.1](releases/UndeadLegacyPanels-v1.0.1.zip)**
+**Current panel extension release: [v1.0.1](releases/UndeadLegacyPanels-v1.0.1.zip)**
+
+**[Subquake's Undead Legacy Total Overhaul Mod for 7D2D](https://ul.subquake.com/)**
 
 A self-contained add-on for the stock 7 Days to Die dedicated server web dashboard
 (`TFP_WebServer`), purpose-built for **Undead Legacy** (UL) servers. It adds two panels -
@@ -18,7 +20,7 @@ Undead Legacy replaces vanilla's skill system with its own classes, research tre
 books - none of which the stock dashboard knows anything about. On a shared server that makes a
 few everyday questions surprisingly hard to answer without asking in chat:
 
-- Has anyone already researched this, or am I about to duplicate their work?
+- Has anyone already researched this; will me doing so lead to me wasting a rare recipe/book/resource?
 - Who on the server can pick locks, and how well?
 - What's everyone's build - who's running melee, who's the sniper, who mines?
 - Where is everyone right now, and where are the bases/outposts people have marked and shared?
