@@ -62,6 +62,18 @@ box on a UL server without any extra configuration.
   installed and enabled (this mod is an add-on to it, not a replacement)
 - EAC must be disabled on the server - it's incompatible with UL regardless of this mod
 
+### Undead Legacy version
+
+Built and tested against **Undead Legacy 2.7.22**. The research node, recipe, and perk-book
+lists are scanned from UL's own config XML at server start, not hardcoded, so they track
+whatever content a given UL build ships. The five attributes/starting classes and their badge
+icons *are* hardcoded (`SkillTreeConstants.cs`, `CLASS_ICON_MAP` in `WebMod/bundle.js`), on the
+basis that they're structural to UL's skill tree rather than content that changes release to
+release. Net effect: this should work unmodified against any 2.x release, but that's an
+expectation based on how it's built, not something verified against every 2.x version. If you
+hit a mismatch on a different 2.x release - especially the class names/icons, the one hardcoded
+piece - please open an issue with the version number.
+
 ## Installation
 
 1. Build the mod (see below) or grab a built release.
