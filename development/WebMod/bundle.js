@@ -460,10 +460,13 @@
 	// stock /map/ route, so this panel never depends on the "web.map" module's permission level.
 	// Tile-coordinate scheme (Y-flip, tileSize, zoom bounds) matches the stock
 	// components/map/tileLayer.js exactly (recovered from the dashboard's own source map) -
-	// only the base tile URL differs. Uses vanilla Leaflet (loaded from CDN, not react-leaflet -
-	// that binding isn't available to us since only React itself arrives via props), managed
-	// directly against a DOM ref rather than through React's virtual DOM, which is the normal way
-	// to embed non-React libraries like Leaflet in a React app.
+	// only the base tile URL differs. Uses vanilla Leaflet (vendored in WebMod/vendor/leaflet
+	// and served through this mod's own /webmods/ files, so the dashboard keeps working on a
+	// server or LAN with no internet egress; not react-leaflet - that binding isn't available
+	// to us since only React itself arrives via props), managed directly against a DOM ref
+	// rather than through React's virtual DOM, which is the normal way to embed non-React
+	// libraries like Leaflet in a React app.
+	var LEAFLET_BASE = '/webmods/UndeadLegacyPanels/vendor/leaflet/';
 	var leafletLoadPromise = null;
 	function loadLeaflet() {
 		if (leafletLoadPromise) {
@@ -476,11 +479,11 @@
 			}
 			var link = document.createElement('link');
 			link.rel = 'stylesheet';
-			link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+			link.href = LEAFLET_BASE + 'leaflet.css';
 			document.head.appendChild(link);
 
 			var script = document.createElement('script');
-			script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+			script.src = LEAFLET_BASE + 'leaflet.js';
 			script.async = true;
 			script.onload = function () {
 				resolve(window.L);
