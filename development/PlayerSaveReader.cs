@@ -141,7 +141,16 @@ namespace UndeadLegacyPanels
 			blob.Position = 0;
 			using (var br = new BinaryReader(blob, System.Text.Encoding.UTF8, leaveOpen: true))
 			{
-				br.ReadByte(); // version
+				byte version = br.ReadByte();
+				if (version != 3)
+				{
+					// The field layout below mirrors Progression.Write() version 3 exactly. On any
+					// other version, guessing would return silently-wrong levels for every player -
+					// an empty result plus a warning is strictly better.
+					Log.Warning("[UndeadLegacyPanels] progressionData version " + version
+						+ " (expected 3) - progression skipped; the parser needs updating for this game build.");
+					return result;
+				}
 				characterLevel = br.ReadUInt16(); // Level
 				br.ReadInt32(); // ExpToNextLevel
 				br.ReadUInt16(); // SkillPoints
@@ -179,6 +188,15 @@ namespace UndeadLegacyPanels
 			using (var br = new BinaryReader(blob, System.Text.Encoding.UTF8, leaveOpen: true))
 			{
 				byte version = br.ReadByte();
+				if (version > 3)
+				{
+					// SkipBuffValue's byte-for-byte skip mirrors BuffValue's version-3 layout; a
+					// newer format would desync the stream and turn the CVar section into garbage
+					// keys/values without ever throwing. Bail loudly instead.
+					Log.Warning("[UndeadLegacyPanels] buffData version " + version
+						+ " (expected <= 3) - CVars skipped; the parser needs updating for this game build.");
+					return result;
+				}
 				ushort activeBuffsCount = br.ReadUInt16();
 				for (int i = 0; i < activeBuffsCount; i++)
 				{
