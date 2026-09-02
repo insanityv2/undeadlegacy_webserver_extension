@@ -1,6 +1,6 @@
 # Undead Legacy Dashboard Panels
 
-**Current release: [v1.0.0](releases/UndeadLegacyPanels-v1.0.0.zip)**
+**Current release: [v1.0.1](releases/UndeadLegacyPanels-v1.0.1.zip)**
 
 A self-contained add-on for the stock 7 Days to Die dedicated server web dashboard
 (`TFP_WebServer`), purpose-built for **Undead Legacy** (UL) servers. It adds two panels -
@@ -78,7 +78,7 @@ piece - please open an issue with the version number.
 
 ## Installation
 
-1. Download the [latest release zip](releases/UndeadLegacyPanels-v1.0.0.zip) (or build from
+1. Download the [latest release zip](releases/UndeadLegacyPanels-v1.0.1.zip) (or build from
    source - see below).
 2. Extract it, then copy the `UndeadLegacyPanels` folder it contains into the server's `Mods/`
    directory, alongside `TFP_WebServer` and `UndeadLegacy`.

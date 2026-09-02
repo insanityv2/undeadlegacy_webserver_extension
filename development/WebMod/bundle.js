@@ -105,6 +105,16 @@
 		);
 	}
 
+	// Raw HTML (not a React element) for a Leaflet DivIcon showing a player's position on the UL
+	// Map - the same class badge as renderClassIcon above, in the same colored-ring style as
+	// shared marker pins (.ul-map-marker-ring), so a player's pin, their name in the Online
+	// Players widget, and any marker they own all carry one identifiable color (design ask).
+	function playerMarkerIconHtml(color, className) {
+		var info = CLASS_ICON_MAP[className];
+		var imgHtml = info ? '<img src="/ulskillicons/' + info.icon + '.png" alt="" />' : '';
+		return '<div class="ul-map-marker-ring" style="border-color: ' + color + ';">' + imgHtml + '</div>';
+	}
+
 	// Ranks a {name: {score, maxPossible}} group, drops zero-score entries (never show a "0
 	// wins"), and returns the top two by score descending. Ties beyond the top two are resolved
 	// by object key iteration order - not accommodated further in the UI per design discussion
@@ -525,6 +535,16 @@
 		// the two panels don't reference each other (design discussion), but PlayerRegistry sorts
 		// deterministically now, so both naturally show players in the same order without needing
 		// to coordinate. Clicking a name centers the map on that player's live position.
+		//
+		// Keeps the FULL roster (online and offline), not just online players - the owner-color
+		// map (getOwnerColors below) needs everyone so a player's color stays stable even while
+		// they're offline (e.g. an offline player who still owns a visible shared marker). The
+		// widget list and the position-marker layer both filter to online players themselves.
+		//
+		// Polled every 5s rather than the 5-minute cadence used elsewhere in this panel and in
+		// the Player List panel - positions move continuously while someone is playing, unlike
+		// talent/research state which only changes on level-up/research-complete (hotfix: the
+		// original 5-minute poll made the position markers this fetch feeds effectively useless).
 		var widgetPlayersState = React.useState([]);
 		var widgetPlayers = widgetPlayersState[0];
 		var setWidgetPlayers = widgetPlayersState[1];
@@ -536,7 +556,7 @@
 				HTTP.get('/api/buildcoordination')
 					.then(function (result) {
 						if (!cancelled) {
-							setWidgetPlayers(result.players.filter(function (p) { return p.online; }));
+							setWidgetPlayers(result.players);
 						}
 					})
 					.catch(function () {
@@ -546,13 +566,15 @@
 			}
 
 			fetchWidgetPlayers();
-			var intervalId = setInterval(fetchWidgetPlayers, 5 * 60 * 1000);
+			var intervalId = setInterval(fetchWidgetPlayers, 5 * 1000);
 			return function () {
 				cancelled = true;
 				clearInterval(intervalId);
 			};
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, []);
+
+		var onlinePlayers = widgetPlayers.filter(function (p) { return p.online; });
 
 		function centerOnPlayer(p) {
 			if (mapRef.current && p.position) {
@@ -569,6 +591,7 @@
 		var widgetMarkers = widgetMarkersState[0];
 		var setWidgetMarkers = widgetMarkersState[1];
 		var markersLayerRef = React.useRef(null);
+		var playersLayerRef = React.useRef(null);
 		var leafletRef = React.useRef(null);
 
 		React.useEffect(function () {
@@ -602,27 +625,44 @@
 		}
 
 		// Server is capped at 10 players (design constraint), so a fixed 10-color palette can give
-		// every owner a stable, distinct color with no collisions. Assigned by sorted owner name so
-		// the mapping stays stable across polls regardless of marker order. Two players who pick the
-		// same icon and name for a marker (design concern) are still told apart by both this color
-		// and the owner name shown in the list/popup.
+		// every player a stable, distinct color with no collisions. Assigned by sorted name so the
+		// mapping stays stable across polls regardless of list order. One color per player is
+		// shared across three places - their name in the Online Players widget, their position pin
+		// on the map, and the ring around any shared marker they own - so all three are
+		// identifiable as "the same player" at a glance (design ask). Two players who pick the same
+		// icon and name for a marker (a separate, earlier concern) are still told apart by this
+		// color plus the owner name shown in the list/popup.
 		var OWNER_COLOR_PALETTE = [
 			'#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
 			'#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990',
 		];
-		function buildOwnerColorMap(markers) {
-			var owners = [];
-			markers.forEach(function (m) {
-				if (m.owner && owners.indexOf(m.owner) === -1) {
-					owners.push(m.owner);
+		function buildOwnerColorMap(names) {
+			var unique = [];
+			names.forEach(function (name) {
+				if (name && unique.indexOf(name) === -1) {
+					unique.push(name);
 				}
 			});
-			owners.sort();
+			unique.sort();
 			var map = {};
-			owners.forEach(function (owner, i) {
-				map[owner] = OWNER_COLOR_PALETTE[i % OWNER_COLOR_PALETTE.length];
+			unique.forEach(function (name, i) {
+				map[name] = OWNER_COLOR_PALETTE[i % OWNER_COLOR_PALETTE.length];
 			});
 			return map;
+		}
+
+		// Built from the full player roster (not just online players) unioned with marker owner
+		// names, so a color stays assigned even for an offline player who still owns a visible
+		// shared marker. Cheap to recompute (at most ~10-15 names) - called directly wherever a
+		// color is needed rather than cached in state.
+		function getOwnerColors() {
+			var names = widgetPlayers.map(function (p) { return p.name; });
+			widgetMarkers.forEach(function (m) {
+				if (m.owner) {
+					names.push(m.owner);
+				}
+			});
+			return buildOwnerColorMap(names);
 		}
 
 		// Free-text filter for the markers widget (design ask: "jump straight to say 'Crafting base
@@ -659,7 +699,7 @@
 				markersLayerRef.current = L.layerGroup().addTo(mapRef.current);
 			}
 			markersLayerRef.current.clearLayers();
-			var ownerColors = buildOwnerColorMap(widgetMarkers);
+			var ownerColors = getOwnerColors();
 			widgetMarkers.forEach(function (m) {
 				var color = m.owner && ownerColors[m.owner] ? ownerColors[m.owner] : '#888888';
 				// A DivIcon combining the real in-game sprite (/ulmapicons/<icon>.png, see
@@ -679,6 +719,41 @@
 					.bindPopup(m.name + '<br/>Placed by ' + (m.owner || 'unknown'));
 			});
 		}, [widgetMarkers, mapReady]);
+
+		// Syncs online players into position pins on the map (hotfix: this layer didn't exist
+		// before - the Online Players widget could center the map on a player's coordinates, but
+		// there was never anything actually drawn there). Re-runs on every widgetPlayers poll
+		// (every 5s, see the fetch effect above), so a moving player's pin tracks them instead of
+		// only ever reflecting their position at map load. No name label on the pin itself
+		// (design decision: the per-player color, shared with their entry in the widget list and
+		// any marker they own, is enough to identify who's who without cluttering the map).
+		React.useEffect(function () {
+			if (!mapReady || !mapRef.current || !leafletRef.current) {
+				return;
+			}
+			var L = leafletRef.current;
+			if (!playersLayerRef.current) {
+				playersLayerRef.current = L.layerGroup().addTo(mapRef.current);
+			}
+			playersLayerRef.current.clearLayers();
+			var ownerColors = getOwnerColors();
+			onlinePlayers.forEach(function (p) {
+				if (!p.position) {
+					return;
+				}
+				var color = ownerColors[p.name] || '#888888';
+				var icon = L.divIcon({
+					className: 'ul-map-marker-icon',
+					html: playerMarkerIconHtml(color, p.class),
+					iconSize: [34, 34],
+					iconAnchor: [17, 17],
+					popupAnchor: [0, -17],
+				});
+				L.marker([p.position.x, p.position.z], { icon: icon })
+					.addTo(playersLayerRef.current)
+					.bindPopup(p.name + ' (Lvl ' + p.level + ') — ' + p.class);
+			});
+		}, [widgetPlayers, mapReady]);
 
 		// Collapsible widgets (design ask): each panel can be hidden independently, collapsing
 		// both gives a map-only view without needing a separate dedicated toggle for that.
@@ -756,6 +831,7 @@
 					mapRef.current = null;
 				}
 				markersLayerRef.current = null;
+				playersLayerRef.current = null;
 				setMapReady(false);
 			};
 			// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -777,8 +853,11 @@
 			);
 		}
 
-		var playerRows = widgetPlayers.map(function (p) {
+		var ownerColors = getOwnerColors();
+
+		var playerRows = onlinePlayers.map(function (p) {
 			var clickable = !!p.position;
+			var color = ownerColors[p.name] || '#888888';
 			return React.createElement(
 				'li',
 				{
@@ -787,17 +866,20 @@
 					onClick: clickable ? function () { centerOnPlayer(p); } : undefined,
 					title: clickable ? 'Center map on ' + p.name : p.name + ' (position unavailable)',
 				},
+				React.createElement('span', {
+					className: 'ul-map-marker-swatch',
+					style: { background: color },
+				}),
 				renderClassIcon(React, p.class),
 				' ' + p.name + ' (Lvl ' + p.level + ')'
 			);
 		});
 
-		var markerOwnerColors = buildOwnerColorMap(widgetMarkers);
 		var filteredWidgetMarkers = widgetMarkers.filter(function (m) {
 			return markerMatchesSearch(m, markerSearchText);
 		});
 		var markerRows = filteredWidgetMarkers.map(function (m, index) {
-			var color = m.owner && markerOwnerColors[m.owner] ? markerOwnerColors[m.owner] : '#888888';
+			var color = m.owner && ownerColors[m.owner] ? ownerColors[m.owner] : '#888888';
 			return React.createElement(
 				'li',
 				{
@@ -833,7 +915,7 @@
 						'Online Players',
 						playersCollapsed,
 						function () { setPlayersCollapsed(!playersCollapsed); },
-						widgetPlayers.length === 0
+						onlinePlayers.length === 0
 							? React.createElement('p', null, 'No players currently online.')
 							: React.createElement('ul', { className: 'ul-map-widget-list' }, playerRows)
 					),
