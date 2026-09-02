@@ -215,6 +215,60 @@ td {
 	opacity: 0.4;
 }
 
+/* Steam sign-in surfaces (see injectSteamLoginBanner / loginRequiredNotice in bundle.js): the
+   backend supports /session/loginsteam but the stock frontend only ever shows the
+   username/password modal, so this mod offers the Steam flow itself - as a banner for
+   logged-out visitors and as each panel's "sign in" state. Steam-green button so it reads as
+   the primary action; the stock modal remains untouched as the fallback. */
+.ul-steam-login-banner {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 1rem;
+	padding: 0.5rem 1rem;
+	background: #171a21; /* Steam's dark header color - reads as "this is the Steam thing" */
+	color: #dcdedf;
+	font-size: 0.95rem;
+	position: relative;
+	z-index: 999;
+}
+.ul-steam-login-btn {
+	display: inline-block;
+	padding: 0.4rem 1rem;
+	border-radius: 3px;
+	background: linear-gradient(to bottom, #75b022, #588a1b);
+	color: #fff;
+	font-weight: bold;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.ul-steam-login-btn:hover {
+	background: linear-gradient(to bottom, #8ed629, #6aa621);
+	color: #fff;
+}
+.ul-steam-login-banner-dismiss {
+	background: none;
+	border: none;
+	color: inherit;
+	cursor: pointer;
+	font-size: 1.2rem;
+	line-height: 1;
+	padding: 0 0.3rem;
+	position: absolute;
+	right: 0.75rem;
+}
+.ul-steam-login-banner-dismiss:hover {
+	color: #f55;
+}
+.ul-login-required {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: 3rem;
+	text-align: center;
+}
+
 /* Sidebar icon swap (design ask). The dashboard's own sidebar (components/sidebar/index.js,
    recovered source) hardcodes <FaFlask/> for every mod route with no per-route icon prop in the
    plugin contract - mod.external.routes only carries {path, name, element} (lib/mods.js). That's
