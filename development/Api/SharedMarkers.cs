@@ -50,43 +50,53 @@ namespace UndeadLegacyPanels.Api
 				displayNameByOwnerKey[kp.FileBaseName] = kp.DisplayName;
 			}
 
-			var seen = new HashSet<string>();
-			var markers = new List<Waypoint>();
+			// Identical markers (same name, icon, and position) commonly exist in several saves
+			// at once: the game auto-adds e.g. a trader's location marker to every player who has
+			// discovered it, and an accepted waypoint invite copies the marker into the accepting
+			// player's save. Group by (name, icon, position) across all saves, then attribute each
+			// group once:
+			//   - a copy carrying an explicit ownerId (only invite-copies do) names the true owner;
+			//   - a group found in exactly one save belongs to that save's player (a player's own
+			//     markers carry no ownerId - confirmed live, see below);
+			//   - a group in multiple saves with no explicit owner anywhere is game-generated
+			//     (trader discovery) - no meaningful owner, listed once with owner null.
+			var groupOrder = new List<string>();
+			var groups = new Dictionary<string, (MarkerData marker, string explicitOwnerKey, List<string> sourcePlayers)>();
 
 			foreach (KnownPlayer kp in players)
 			{
-				PlayerDataFile file = new PlayerDataFile();
-				try
-				{
-					file.Load(playerDir, kp.FileBaseName);
-				}
-				catch (System.Exception ex)
-				{
-					Log.Warning("[UndeadLegacyPanels] SharedMarkers load failed for " + kp.FileBaseName + ": " + ex.Message);
-					continue;
-				}
+				// Cached, and pre-filtered to manually-placed markers - see
+				// PlayerSaveReader's extraction and PlayerSaveCache.
+				PlayerSaveData save = PlayerSaveCache.Get(playerDir, kp.FileBaseName);
 
-				if (file.waypoints == null)
+				foreach (MarkerData marker in save.Markers)
 				{
-					continue;
-				}
-
-				foreach (Waypoint wp in file.waypoints.Collection.list)
-				{
-					if (wp.lastKnownPositionEntityId != -1)
+					string groupKey = marker.RawName + "|" + marker.Icon + "|" + marker.X + "," + marker.Y + "," + marker.Z;
+					if (!groups.TryGetValue(groupKey, out var group))
 					{
-						continue; // auto-tracked (vehicle/drone) - owner-only, not shared
+						group = (marker, null, new List<string>());
+						groupOrder.Add(groupKey);
 					}
-
-					string ownerKey = wp.ownerId != null ? wp.ownerId.CombinedString : "unknown";
-					string dedupeKey = ownerKey + "|" + wp.pos.x + "," + wp.pos.y + "," + wp.pos.z + "|" + (wp.name != null ? wp.name.Text : "");
-					if (!seen.Add(dedupeKey))
+					if (marker.OwnerKey != null)
 					{
-						continue;
+						// An explicit ownerId (invite-copy) is authoritative for the whole group.
+						group.explicitOwnerKey = marker.OwnerKey;
 					}
-
-					markers.Add(wp);
+					else if (!group.sourcePlayers.Contains(kp.FileBaseName))
+					{
+						group.sourcePlayers.Add(kp.FileBaseName);
+					}
+					groups[groupKey] = group;
 				}
+			}
+
+			var markers = new List<(MarkerData marker, string ownerKey)>();
+			foreach (string groupKey in groupOrder)
+			{
+				var group = groups[groupKey];
+				string ownerKey = group.explicitOwnerKey
+					?? (group.sourcePlayers.Count == 1 ? group.sourcePlayers[0] : null);
+				markers.Add((group.marker, ownerKey));
 			}
 
 			JsonWriter writer;
@@ -96,7 +106,7 @@ namespace UndeadLegacyPanels.Api
 			writer.WriteBeginArray();
 
 			bool first = true;
-			foreach (Waypoint wp in markers)
+			foreach ((MarkerData marker, string ownerKey) in markers)
 			{
 				if (!first)
 				{
@@ -104,9 +114,11 @@ namespace UndeadLegacyPanels.Api
 				}
 				first = false;
 
-				string name = wp.name != null ? wp.name.Text : "";
-				// bUsingLocalizationId means Text is a localization key, not literal display text.
-				if (wp.bUsingLocalizationId && !string.IsNullOrEmpty(name))
+				string name = marker.RawName;
+				// NameIsLocalizationId means RawName is a localization key, not literal display
+				// text. Resolved here at response time, not at extraction, so cached entries
+				// never bake in localization state.
+				if (marker.NameIsLocalizationId && !string.IsNullOrEmpty(name))
 				{
 					name = Localization.Get(name, false);
 				}
@@ -116,29 +128,30 @@ namespace UndeadLegacyPanels.Api
 				writer.WriteString(string.IsNullOrEmpty(name) ? "(unnamed marker)" : name);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("icon");
-				writer.WriteString(wp.icon);
+				writer.WriteString(marker.Icon);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("owner");
+				// ownerKey null = game-generated marker present in several saves - owner is null in
+				// the response (the frontend already renders that as its neutral/unowned style).
 				string ownerDisplayName = null;
-				if (wp.ownerId != null)
+				if (ownerKey != null && !displayNameByOwnerKey.TryGetValue(ownerKey, out ownerDisplayName))
 				{
-					if (!displayNameByOwnerKey.TryGetValue(wp.ownerId.CombinedString, out ownerDisplayName))
-					{
-						ownerDisplayName = wp.ownerId.ReadablePlatformUserIdentifier;
-					}
+					// A marker copied from a player we have no save/players.xml entry for -
+					// show the raw key rather than nothing.
+					ownerDisplayName = ownerKey;
 				}
 				writer.WriteString(ownerDisplayName);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("position");
 				writer.WriteBeginObject();
 				writer.WritePropertyName("x");
-				writer.WriteInt32(wp.pos.x);
+				writer.WriteInt32(marker.X);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("y");
-				writer.WriteInt32(wp.pos.y);
+				writer.WriteInt32(marker.Y);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("z");
-				writer.WriteInt32(wp.pos.z);
+				writer.WriteInt32(marker.Z);
 				writer.WriteEndObject();
 				writer.WriteEndObject();
 			}

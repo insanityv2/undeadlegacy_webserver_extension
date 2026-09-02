@@ -6,7 +6,13 @@
     <LangVersion>7.3</LangVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>bin\</OutputPath>
-    <GameInstallDir Condition="'$(GameInstallDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die</GameInstallDir>
+    <GameInstallDir Condition="'$(GameInstallDir)' == '' AND $([MSBuild]::IsOSPlatform('Windows'))">C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die</GameInstallDir>
+    <GameInstallDir Condition="'$(GameInstallDir)' == '' AND $([MSBuild]::IsOSPlatform('OSX'))">$(HOME)/Library/Application Support/Steam/steamapps/common/7 Days To Die</GameInstallDir>
+    <GameInstallDir Condition="'$(GameInstallDir)' == ''">$(HOME)/.local/share/Steam/steamapps/common/7 Days To Die</GameInstallDir>
+    <!-- A dedicated server install names its data folder 7DaysToDieServer_Data; the client
+         uses 7DaysToDie_Data. Probe for whichever exists under GameInstallDir. -->
+    <GameDataDir Condition="Exists('$(GameInstallDir)/7DaysToDieServer_Data/Managed')">$(GameInstallDir)/7DaysToDieServer_Data</GameDataDir>
+    <GameDataDir Condition="'$(GameDataDir)' == ''">$(GameInstallDir)/7DaysToDie_Data</GameDataDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,23 +24,23 @@
          used during investigation (design doc §2). Override GameInstallDir to build elsewhere,
          e.g. `dotnet build /p:GameInstallDir="D:\some\other\path"`. -->
     <Reference Include="Assembly-CSharp">
-      <HintPath>$(GameInstallDir)\7DaysToDie_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(GameDataDir)/Managed/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="LogLibrary">
-      <HintPath>$(GameInstallDir)\7DaysToDie_Data\Managed\LogLibrary.dll</HintPath>
+      <HintPath>$(GameDataDir)/Managed/LogLibrary.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Utf8Json">
-      <HintPath>$(GameInstallDir)\7DaysToDie_Data\Managed\Utf8Json.dll</HintPath>
+      <HintPath>$(GameDataDir)/Managed/Utf8Json.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="WebServer">
-      <HintPath>$(GameInstallDir)\Mods\TFP_WebServer\WebServer.dll</HintPath>
+      <HintPath>$(GameInstallDir)/Mods/TFP_WebServer/WebServer.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(GameInstallDir)\7DaysToDie_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(GameDataDir)/Managed/UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

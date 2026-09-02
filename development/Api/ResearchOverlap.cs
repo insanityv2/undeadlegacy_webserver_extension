@@ -54,7 +54,7 @@ namespace UndeadLegacyPanels.Api
 				}
 				firstPlayer = false;
 
-				PlayerSaveData save = PlayerSaveReader.Load(playerDir, kp.FileBaseName);
+				PlayerSaveData save = PlayerSaveCache.Get(playerDir, kp.FileBaseName);
 
 				var unlockedResearch = new List<string>(alwaysUnlockedResearch);
 				foreach (string nodeName in allNodeNames)

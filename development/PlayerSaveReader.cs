@@ -12,9 +12,31 @@ namespace UndeadLegacyPanels
 	/// (progressionData / buffData), since decoding those fully (Progression.Read / EntityBuffs.Read)
 	/// would require a live EntityAlive instance we don't have and don't want to fabricate.
 	/// </summary>
+	/// <summary>
+	/// One manually player-placed map marker, extracted from PlayerDataFile.waypoints into plain
+	/// data so cached PlayerSaveData never holds live game objects (Waypoint references a
+	/// PlatformUserIdentifierAbs and localization state we don't want to retain or share across
+	/// threads).
+	/// </summary>
+	public class MarkerData
+	{
+		public string RawName; // literal text, or a localization key if NameIsLocalizationId
+		public bool NameIsLocalizationId;
+		public string Icon;
+		public string OwnerKey; // ownerId.CombinedString, or null for the save's own markers
+		public int X;
+		public int Y;
+		public int Z;
+	}
+
 	public class PlayerSaveData
 	{
 		public List<string> UnlockedRecipes = new List<string>();
+
+		/// Manually placed map markers only - auto-tracked entity waypoints
+		/// (vehicles/drones, lastKnownPositionEntityId != -1) are excluded at extraction,
+		/// matching Waypoint.CanBeViewedBy's owner-only rule for those.
+		public List<MarkerData> Markers = new List<MarkerData>();
 
 		public int CharacterLevel;
 
@@ -54,6 +76,29 @@ namespace UndeadLegacyPanels
 			if (file.unlockedRecipeList != null)
 			{
 				result.UnlockedRecipes.AddRange(file.unlockedRecipeList);
+			}
+
+			// waypoints.Read() runs inline inside PlayerDataFile.Read() (same as questJournal),
+			// so the collection is already fully populated - extract to plain data here.
+			if (file.waypoints != null)
+			{
+				foreach (Waypoint wp in file.waypoints.Collection.list)
+				{
+					if (wp.lastKnownPositionEntityId != -1)
+					{
+						continue; // auto-tracked (vehicle/drone) - owner-only, not shared
+					}
+					result.Markers.Add(new MarkerData
+					{
+						RawName = wp.name != null ? wp.name.Text : "",
+						NameIsLocalizationId = wp.bUsingLocalizationId,
+						Icon = wp.icon,
+						OwnerKey = wp.ownerId != null ? wp.ownerId.CombinedString : null,
+						X = wp.pos.x,
+						Y = wp.pos.y,
+						Z = wp.pos.z,
+					});
+				}
 			}
 
 			try
@@ -96,7 +141,16 @@ namespace UndeadLegacyPanels
 			blob.Position = 0;
 			using (var br = new BinaryReader(blob, System.Text.Encoding.UTF8, leaveOpen: true))
 			{
-				br.ReadByte(); // version
+				byte version = br.ReadByte();
+				if (version != 3)
+				{
+					// The field layout below mirrors Progression.Write() version 3 exactly. On any
+					// other version, guessing would return silently-wrong levels for every player -
+					// an empty result plus a warning is strictly better.
+					Log.Warning("[UndeadLegacyPanels] progressionData version " + version
+						+ " (expected 3) - progression skipped; the parser needs updating for this game build.");
+					return result;
+				}
 				characterLevel = br.ReadUInt16(); // Level
 				br.ReadInt32(); // ExpToNextLevel
 				br.ReadUInt16(); // SkillPoints
@@ -134,6 +188,15 @@ namespace UndeadLegacyPanels
 			using (var br = new BinaryReader(blob, System.Text.Encoding.UTF8, leaveOpen: true))
 			{
 				byte version = br.ReadByte();
+				if (version > 3)
+				{
+					// SkipBuffValue's byte-for-byte skip mirrors BuffValue's version-3 layout; a
+					// newer format would desync the stream and turn the CVar section into garbage
+					// keys/values without ever throwing. Bail loudly instead.
+					Log.Warning("[UndeadLegacyPanels] buffData version " + version
+						+ " (expected <= 3) - CVars skipped; the parser needs updating for this game build.");
+					return result;
+				}
 				ushort activeBuffsCount = br.ReadUInt16();
 				for (int i = 0; i < activeBuffsCount; i++)
 				{

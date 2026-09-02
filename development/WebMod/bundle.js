@@ -38,6 +38,52 @@
 		return { data: data, error: error };
 	}
 
+	// The stock dashboard's login modal is username/password only (createwebuser accounts),
+	// even though the backend fully supports Steam OpenID at /session/loginsteam - the frontend
+	// just never exposes it (checked against the shipped source map: components/auth/loginForm.js
+	// has no Steam path). On a server with no createwebuser accounts that leaves players with no
+	// discoverable way in at all, so this mod surfaces the Steam flow itself: a sign-in prompt on
+	// its own panels instead of a wall of 403s, and a banner for logged-out visitors (below).
+	var STEAM_LOGIN_URL = '/session/loginsteam';
+
+	// null = still checking, true/false = known. Uses plain fetch, not the HTTP prop - the prop
+	// only exists inside route components and the banner injection below runs outside React.
+	function fetchLoggedIn() {
+		return fetch('/userstatus', { credentials: 'same-origin' })
+			.then(function (r) { return r.json(); })
+			.then(function (d) { return !!(d && d.data && d.data.loggedIn); })
+			.catch(function () { return false; });
+	}
+
+	function useUserStatus(React) {
+		var state = React.useState(null);
+		React.useEffect(function () {
+			var cancelled = false;
+			fetchLoggedIn().then(function (loggedIn) {
+				if (!cancelled) {
+					state[1](loggedIn);
+				}
+			});
+			return function () { cancelled = true; };
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, []);
+		return state[0];
+	}
+
+	function steamLoginButton(React) {
+		return React.createElement('a', { className: 'ul-steam-login-btn', href: STEAM_LOGIN_URL }, 'Sign in through Steam');
+	}
+
+	function loginRequiredNotice(React, panelTitle) {
+		return React.createElement(
+			'div',
+			{ className: 'ul-login-required' },
+			React.createElement('h1', null, panelTitle),
+			React.createElement('p', null, 'This panel shows server data and needs you to be signed in.'),
+			steamLoginButton(React)
+		);
+	}
+
 	// Presentation-only display names for the raw tag/key names the backend returns - kept on
 	// the frontend deliberately, since the backend stays generic/data-only (design comment in
 	// Api/BuildCoordination.cs) and these are a small, finite, hand-known set (unlike
@@ -210,6 +256,10 @@
 		var React = props.React;
 		var HTTP = props.HTTP;
 
+		// Everything this panel fetches is login-gated server-side (permission level 1000);
+		// fetching before the session exists just paints the console with 403s.
+		var loggedIn = useUserStatus(React);
+
 		var dataState = React.useState(null); // { players: [{coordination, overlap}], searchIndex }
 		var data = dataState[0];
 		var setData = dataState[1];
@@ -238,6 +288,9 @@
 		var setValidationError = validationErrorState[1];
 
 		React.useEffect(function () {
+			if (loggedIn !== true) {
+				return;
+			}
 			var cancelled = false;
 
 			// Refetches both endpoints and replaces `data` in place - deliberately doesn't touch
@@ -295,7 +348,7 @@
 				clearInterval(intervalId);
 			};
 			// eslint-disable-next-line react-hooks/exhaustive-deps
-		}, []);
+		}, [loggedIn]);
 
 		function commitSearch() {
 			if (!data) {
@@ -318,10 +371,13 @@
 			setValidationError(null);
 		}
 
+		if (loggedIn === false) {
+			return loginRequiredNotice(React, 'Player List');
+		}
 		if (error) {
 			return React.createElement('div', null, 'Failed to load: ' + error);
 		}
-		if (!data) {
+		if (loggedIn === null || !data) {
 			return React.createElement('div', null, 'Loading...');
 		}
 
@@ -460,10 +516,13 @@
 	// stock /map/ route, so this panel never depends on the "web.map" module's permission level.
 	// Tile-coordinate scheme (Y-flip, tileSize, zoom bounds) matches the stock
 	// components/map/tileLayer.js exactly (recovered from the dashboard's own source map) -
-	// only the base tile URL differs. Uses vanilla Leaflet (loaded from CDN, not react-leaflet -
-	// that binding isn't available to us since only React itself arrives via props), managed
-	// directly against a DOM ref rather than through React's virtual DOM, which is the normal way
-	// to embed non-React libraries like Leaflet in a React app.
+	// only the base tile URL differs. Uses vanilla Leaflet (vendored in WebMod/vendor/leaflet
+	// and served through this mod's own /webmods/ files, so the dashboard keeps working on a
+	// server or LAN with no internet egress; not react-leaflet - that binding isn't available
+	// to us since only React itself arrives via props), managed directly against a DOM ref
+	// rather than through React's virtual DOM, which is the normal way to embed non-React
+	// libraries like Leaflet in a React app.
+	var LEAFLET_BASE = '/webmods/UndeadLegacyPanels/vendor/leaflet/';
 	var leafletLoadPromise = null;
 	function loadLeaflet() {
 		if (leafletLoadPromise) {
@@ -476,11 +535,11 @@
 			}
 			var link = document.createElement('link');
 			link.rel = 'stylesheet';
-			link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+			link.href = LEAFLET_BASE + 'leaflet.css';
 			document.head.appendChild(link);
 
 			var script = document.createElement('script');
-			script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+			script.src = LEAFLET_BASE + 'leaflet.js';
 			script.async = true;
 			script.onload = function () {
 				resolve(window.L);
@@ -526,6 +585,10 @@
 		var containerRef = React.useRef(null);
 		var mapRef = React.useRef(null);
 
+		// Tiles, icons, and both widget endpoints are login-gated server-side - see
+		// PlayerListPanel's identical gate.
+		var loggedIn = useUserStatus(React);
+
 		var errorState = React.useState(null);
 		var error = errorState[0];
 		var setError = errorState[1];
@@ -550,6 +613,9 @@
 		var setWidgetPlayers = widgetPlayersState[1];
 
 		React.useEffect(function () {
+			if (loggedIn !== true) {
+				return;
+			}
 			var cancelled = false;
 
 			function fetchWidgetPlayers() {
@@ -572,7 +638,7 @@
 				clearInterval(intervalId);
 			};
 			// eslint-disable-next-line react-hooks/exhaustive-deps
-		}, []);
+		}, [loggedIn]);
 
 		var onlinePlayers = widgetPlayers.filter(function (p) { return p.online; });
 
@@ -595,6 +661,9 @@
 		var leafletRef = React.useRef(null);
 
 		React.useEffect(function () {
+			if (loggedIn !== true) {
+				return;
+			}
 			var cancelled = false;
 
 			function fetchWidgetMarkers() {
@@ -616,7 +685,7 @@
 				clearInterval(intervalId);
 			};
 			// eslint-disable-next-line react-hooks/exhaustive-deps
-		}, []);
+		}, [loggedIn]);
 
 		function centerOnMarker(m) {
 			if (mapRef.current) {
@@ -714,9 +783,11 @@
 					iconAnchor: [17, 17],
 					popupAnchor: [0, -17],
 				});
+				// A null owner is a game-generated marker (e.g. a discovered trader) - saying
+				// "Placed by unknown" for those is just wrong, so omit the byline.
 				L.marker([m.position.x, m.position.z], { icon: icon })
 					.addTo(markersLayerRef.current)
-					.bindPopup(m.name + '<br/>Placed by ' + (m.owner || 'unknown'));
+					.bindPopup(m.owner ? m.name + '<br/>Placed by ' + m.owner : m.name);
 			});
 		}, [widgetMarkers, mapReady]);
 
@@ -768,6 +839,9 @@
 		var setMarkerSearchText = markerSearchTextState[1];
 
 		React.useEffect(function () {
+			if (loggedIn !== true) {
+				return;
+			}
 			var cancelled = false;
 
 			Promise.all([loadLeaflet(), HTTP.get('/api/map/config')])
@@ -835,7 +909,7 @@
 				setMapReady(false);
 			};
 			// eslint-disable-next-line react-hooks/exhaustive-deps
-		}, []);
+		}, [loggedIn]);
 
 		// Shared header + collapse-toggle chrome for both widgets, so collapsing either (or
 		// both, for a map-only view) is just a title-bar click - no separate dedicated toggle.
@@ -892,9 +966,16 @@
 					className: 'ul-map-marker-swatch',
 					style: { background: color },
 				}),
-				m.name + ' — ' + (m.owner || 'unknown')
+				m.owner ? m.name + ' — ' + m.owner : m.name
 			);
 		});
+
+		if (loggedIn === false) {
+			return loginRequiredNotice(React, 'UL Map');
+		}
+		if (loggedIn === null) {
+			return React.createElement('div', null, 'Loading...');
+		}
 
 		return React.createElement(
 			'div',
@@ -944,6 +1025,44 @@
 			)
 		);
 	}
+
+	// Logged-out visitors land on a dashboard whose only visible login is the username/password
+	// modal - and those accounts (createwebuser) usually don't exist. Inject one banner at the
+	// top of the page offering the Steam flow the backend already supports. Deliberately plain
+	// DOM (no React) so it works on every route including pages this mod doesn't own, and
+	// deliberately additive - the stock modal is left untouched for servers that do use
+	// createwebuser accounts. Disappears on its own once a session exists (the Steam round-trip
+	// reloads the page, and the check below simply doesn't inject).
+	function injectSteamLoginBanner() {
+		fetchLoggedIn().then(function (loggedIn) {
+			if (loggedIn || document.getElementById('ul-steam-login-banner')) {
+				return;
+			}
+			var banner = document.createElement('div');
+			banner.id = 'ul-steam-login-banner';
+			banner.className = 'ul-steam-login-banner';
+
+			var text = document.createElement('span');
+			text.textContent = 'You are not signed in - most panels need a session.';
+			banner.appendChild(text);
+
+			var link = document.createElement('a');
+			link.className = 'ul-steam-login-btn';
+			link.href = STEAM_LOGIN_URL;
+			link.textContent = 'Sign in through Steam';
+			banner.appendChild(link);
+
+			var dismiss = document.createElement('button');
+			dismiss.className = 'ul-steam-login-banner-dismiss';
+			dismiss.type = 'button';
+			dismiss.textContent = '×';
+			dismiss.onclick = function () { banner.remove(); };
+			banner.appendChild(dismiss);
+
+			document.body.insertBefore(banner, document.body.firstChild);
+		});
+	}
+	injectSteamLoginBanner();
 
 	// Route keys double as both the URL path segment (mods/<modname>/<key>, built verbatim with
 	// no encoding by the host's lib/mods.js) and the sidebar link label (Sidebar's
