@@ -11,15 +11,37 @@ td {
 	text-align: left;
 }
 
-/* Visual language (design discussion): excluded row = offline (never rendered at all);
-   greyed row = online but doesn't match the active search chip; normal = matches, or no
-   search active. */
+/* Visual language (design discussion): offline rows are hidden by default (see the "Show
+   offline players too" checkbox); greyed row = doesn't match the active search chip; normal =
+   matches, or no search active. */
 .ul-row-nomatch {
 	opacity: 0.35;
 	filter: grayscale(1);
 }
 .ul-row-match {
 	background: rgba(80, 200, 120, 0.12);
+}
+
+/* Offline row (only visible with "Show offline players too" checked) - a lighter dimming than
+   .ul-row-nomatch so an offline-but-matching row still reads as distinct from an
+   online-but-nomatch one. CSS opacity isn't additive across classes on the same element, so the
+   combined case (offline AND doesn't match the active search) gets its own rule below rather
+   than relying on both classes' opacity values somehow stacking. */
+.ul-row-offline {
+	opacity: 0.6;
+	font-style: italic;
+}
+.ul-row-nomatch.ul-row-offline {
+	opacity: 0.25;
+}
+
+.ul-show-offline-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+	cursor: pointer;
+	font-size: 0.9rem;
 }
 
 .ul-search-input {

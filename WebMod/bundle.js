@@ -191,8 +191,10 @@
 	// Coordination - consolidated per design discussion: the search/highlight mechanism made a
 	// standalone research-node browsing table unnecessary, and both panels show the same player
 	// roster anyway). Visual language, as specified:
-	//   - excluded from the list entirely = player is offline (never shown, not even greyed)
-	//   - greyed out = player IS online, but doesn't match the currently active search
+	//   - offline players are excluded from the list by default (first user request after
+	//     shipping: the "Show offline players too" checkbox brings them back in, marked
+	//     "(offline)" and dimmed, so a search can find someone who isn't currently logged in)
+	//   - greyed out = doesn't match the currently active search
 	//   - normal/highlighted = matches the active search, or no search is active
 	function PlayerListPanel(props) {
 		var React = props.React;
@@ -213,6 +215,13 @@
 		var chipState = React.useState(null); // {name, category} | null
 		var chip = chipState[0];
 		var setChip = chipState[1];
+
+		// Off by default (matches the original "online players only" behavior) - checking it
+		// brings offline players into both the visible list and the search match, so "who else
+		// has this" can be answered for someone who isn't currently logged in.
+		var showOfflineState = React.useState(false);
+		var showOffline = showOfflineState[0];
+		var setShowOffline = showOfflineState[1];
 
 		var validationErrorState = React.useState(null);
 		var validationError = validationErrorState[0];
@@ -238,10 +247,11 @@
 							overlapByPlatformId[p.platformId] = p;
 						});
 
+						// Keeps every known player, online or not - the "show offline players"
+						// checkbox below filters at render time instead of here, so toggling it
+						// doesn't need a refetch, and searching with it checked can find an
+						// offline player who has something unlocked (design ask).
 						var merged = coordination.players
-							.filter(function (p) {
-								return p.online;
-							})
 							.map(function (p) {
 								return {
 									coordination: p,
@@ -341,14 +351,24 @@
 					validationError ? React.createElement('div', { className: 'ul-search-error' }, validationError) : null
 			  );
 
-		var rows = data.players.map(function (row) {
+		var visiblePlayers = data.players.filter(function (row) {
+			return showOffline || row.coordination.online;
+		});
+
+		var rows = visiblePlayers.map(function (row) {
 			var p = row.coordination;
 			var matches = chip ? playerMatchesChip(row.overlap, chip) : true;
-			var rowClass = chip ? (matches ? 'ul-row-match' : 'ul-row-nomatch') : '';
+			var classes = [];
+			if (chip) {
+				classes.push(matches ? 'ul-row-match' : 'ul-row-nomatch');
+			}
+			if (!p.online) {
+				classes.push('ul-row-offline');
+			}
 			return React.createElement(
 				'tr',
-				{ key: p.platformId, className: rowClass },
-				React.createElement('td', null, p.name),
+				{ key: p.platformId, className: classes.join(' ') },
+				React.createElement('td', null, p.name + (p.online ? '' : ' (offline)')),
 				React.createElement('td', null, p.level),
 				React.createElement('td', { className: 'ul-class-cell' }, renderClassIcon(React, p.class)),
 				favoredCell(React, p.meleeWeapons),
@@ -358,17 +378,34 @@
 		});
 
 		var noneOnlineNotice =
-			data.players.length === 0 ? React.createElement('p', null, 'No players are currently online.') : null;
+			visiblePlayers.length === 0
+				? React.createElement('p', null, showOffline ? 'No known players yet.' : 'No players are currently online.')
+				: null;
 
 		var allGreyed =
 			chip &&
-			data.players.length > 0 &&
-			data.players.every(function (row) {
+			visiblePlayers.length > 0 &&
+			visiblePlayers.every(function (row) {
 				return !playerMatchesChip(row.overlap, chip);
 			});
 		var noMatchNotice = allGreyed
-			? React.createElement('p', { className: 'ul-no-match-notice' }, 'No online player currently has this.')
+			? React.createElement(
+					'p',
+					{ className: 'ul-no-match-notice' },
+					showOffline ? 'No player currently has this.' : 'No online player currently has this. Try "Show offline players".'
+			  )
 			: null;
+
+		var showOfflineToggle = React.createElement(
+			'label',
+			{ className: 'ul-show-offline-toggle' },
+			React.createElement('input', {
+				type: 'checkbox',
+				checked: showOffline,
+				onChange: function (e) { setShowOffline(e.target.checked); },
+			}),
+			' Show offline players too'
+		);
 
 		return React.createElement(
 			'div',
@@ -377,13 +414,15 @@
 			React.createElement(
 				'p',
 				null,
-				"Shows currently online players only. Search a research node, recipe, or perk book to highlight " +
-					"who has it — greyed rows don't match the active search."
+				"Shows currently online players by default. Search a research node, recipe, or perk book to " +
+					"highlight who has it — greyed rows don't match the active search. Check \"Show offline " +
+					"players too\" to include everyone else, including in that search."
 			),
 			searchBar,
+			showOfflineToggle,
 			noMatchNotice,
 			noneOnlineNotice,
-			data.players.length > 0
+			visiblePlayers.length > 0
 				? React.createElement(
 						'table',
 						null,
