@@ -51,7 +51,7 @@ namespace UndeadLegacyPanels.Api
 			}
 
 			var seen = new HashSet<string>();
-			var markers = new List<Waypoint>();
+			var markers = new List<(Waypoint wp, string ownerKey)>();
 
 			foreach (KnownPlayer kp in players)
 			{
@@ -78,14 +78,19 @@ namespace UndeadLegacyPanels.Api
 						continue; // auto-tracked (vehicle/drone) - owner-only, not shared
 					}
 
-					string ownerKey = wp.ownerId != null ? wp.ownerId.CombinedString : "unknown";
+					// A player's own markers carry no ownerId in their own save (confirmed live:
+					// every marker on a real server came back owner-less) - ownerId is only set on
+					// copies received via a waypoint invite. So a null ownerId means "owned by the
+					// player whose save this is": attribute it to the save it came from instead of
+					// falling into an "unknown" bucket that collapses the per-owner coloring.
+					string ownerKey = wp.ownerId != null ? wp.ownerId.CombinedString : kp.FileBaseName;
 					string dedupeKey = ownerKey + "|" + wp.pos.x + "," + wp.pos.y + "," + wp.pos.z + "|" + (wp.name != null ? wp.name.Text : "");
 					if (!seen.Add(dedupeKey))
 					{
 						continue;
 					}
 
-					markers.Add(wp);
+					markers.Add((wp, ownerKey));
 				}
 			}
 
@@ -96,7 +101,7 @@ namespace UndeadLegacyPanels.Api
 			writer.WriteBeginArray();
 
 			bool first = true;
-			foreach (Waypoint wp in markers)
+			foreach ((Waypoint wp, string ownerKey) in markers)
 			{
 				if (!first)
 				{
@@ -119,13 +124,11 @@ namespace UndeadLegacyPanels.Api
 				writer.WriteString(wp.icon);
 				writer.WriteValueSeparator();
 				writer.WritePropertyName("owner");
-				string ownerDisplayName = null;
-				if (wp.ownerId != null)
+				if (!displayNameByOwnerKey.TryGetValue(ownerKey, out string ownerDisplayName))
 				{
-					if (!displayNameByOwnerKey.TryGetValue(wp.ownerId.CombinedString, out ownerDisplayName))
-					{
-						ownerDisplayName = wp.ownerId.ReadablePlatformUserIdentifier;
-					}
+					// A marker copied from a player we have no save/players.xml entry for -
+					// show the raw readable id rather than nothing.
+					ownerDisplayName = wp.ownerId != null ? wp.ownerId.ReadablePlatformUserIdentifier : ownerKey;
 				}
 				writer.WriteString(ownerDisplayName);
 				writer.WriteValueSeparator();
