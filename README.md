@@ -58,7 +58,9 @@ level. Adds two things the stock map doesn't have:
 
 Undead Legacy's own save-position redirect is honored automatically (tiles, waypoints, and player
 data are all read from wherever UL's own patch puts the active save), so this works out of the
-box on a UL server without any extra configuration.
+box on a UL server without any extra configuration. The map library it's built on (Leaflet) ships
+inside this mod rather than being fetched from a CDN at runtime, so it also works on a dashboard
+reached with no outbound internet access from the browser (LAN-only, VPN, etc.).
 
 ## Requirements
 
@@ -68,15 +70,16 @@ box on a UL server without any extra configuration.
 
 ### Undead Legacy version
 
-Built and tested against **Undead Legacy 2.7.22**. The research node, recipe, and perk-book
-lists are scanned from UL's own config XML at server start, not hardcoded, so they track
-whatever content a given UL build ships. The five attributes/starting classes and their badge
-icons *are* hardcoded (`SkillTreeConstants.cs`, `CLASS_ICON_MAP` in `WebMod/bundle.js`), on the
-basis that they're structural to UL's skill tree rather than content that changes release to
-release. Net effect: this should work unmodified against any 2.x release, but that's an
-expectation based on how it's built, not something verified against every 2.x version. If you
-hit a mismatch on a different 2.x release - especially the class names/icons, the one hardcoded
-piece - please open an issue with the version number.
+Built and tested against **Undead Legacy 2.7.22**, and separately verified against a live
+**V2.6** dedicated-server deployment. The research node, recipe, and perk-book lists are scanned
+from UL's own config XML at server start, not hardcoded, so they track whatever content a given
+UL build ships. The five attributes/starting classes and their badge icons *are* hardcoded
+(`SkillTreeConstants.cs`, `CLASS_ICON_MAP` in `WebMod/bundle.js`), on the basis that they're
+structural to UL's skill tree rather than content that changes release to release. Net effect:
+this should work unmodified against any 2.x release, and now has two data points from opposite
+ends of the 2.x line backing that up rather than it being a pure expectation. If you hit a
+mismatch on a different 2.x release - especially the class names/icons, the one hardcoded piece -
+please open an issue with the version number.
 
 ## Installation
 
@@ -91,6 +94,26 @@ No `serveradmin.xml` changes are needed; if you want to restrict either panel fu
 "any logged-in user", use the dashboard's own permission management (`admin` / `webpermission`)
 on the `web.ulmap`, `web.ulmapicons`, `web.ulskillicons`, `webapi.researchoverlap`,
 `webapi.buildcoordination`, and `webapi.sharedmarkers` modules.
+
+### Signing in
+
+Everything in this mod needs a dashboard session - anonymous visitors are level 2000, every
+route/endpoint here is level 1000. There are two ways to get one:
+
+- **Sign in through Steam (recommended, no setup)** - the stock dashboard's backend has always
+  supported Steam OpenID login (`/session/loginsteam`), but its own frontend never exposed it -
+  the only login UI it ships is a username/password modal for accounts an admin has to create one
+  at a time with the in-game `createwebuser` command. This mod surfaces the Steam flow itself: a
+  "Sign in through Steam" banner appears at the top of the dashboard for anyone not logged in, on
+  every page, and each of this mod's own panels shows the same prompt instead of a login-gated
+  panel quietly failing. No server-side setup - it works the moment this mod is installed.
+- **`createwebuser` accounts still work as before** - if your server already issues these, they
+  continue to work unchanged; the Steam banner and this mod's own login prompts simply don't
+  appear once a session exists, from either method.
+
+One known cosmetic gap: the sidebar icons this mod adds (see below) are themselves served from a
+login-gated route, so they render blank until you sign in - functionality is unaffected, only
+those two icons.
 
 ## Project layout
 
@@ -110,12 +133,18 @@ cd development
 dotnet build
 ```
 
-By default the project looks for the game at the standard Steam install path. Point it elsewhere
-with:
+By default the project looks for the game at the standard Steam install path for whichever OS
+you're building on (Windows, macOS, or Linux). Point it elsewhere - e.g. a dedicated server
+install, which is a different directory tree than a client install - with:
 
 ```
-dotnet build /p:GameInstallDir="D:\some\other\path"
+dotnet build /p:GameInstallDir="/path/to/your/install"
 ```
+
+The project auto-detects whether that path is a client install (`7DaysToDie_Data/`) or a
+dedicated-server install (`7DaysToDieServer_Data/`) and references the right one either way, so
+the same command works for both. Verified building against a Windows client install (2.7.22) and
+a Linux dedicated-server install (V2.6, buildid 22422094).
 
 The build output (`development/bin/UndeadLegacyPanels.dll`) plus `development/WebMod/` and
 `development/ModInfo.xml` together make up the deployable mod - the same three things each
@@ -126,7 +155,9 @@ release zip packages up.
 - **Backend** (`development/Api/`, C#): reads player save files and UL's own config XML directly
   (no dependency on UL's assemblies), computes talent/research/recipe unlock state, and exposes
   it as JSON over new REST endpoints, auto-discovered by the stock web server the same way its
-  own built-in endpoints are.
+  own built-in endpoints are. Parsed saves are cached and keyed on each `.ttp` file's
+  modification time and size (`PlayerSaveCache.cs`), so a dashboard poll re-parses only the
+  players who've actually saved since the last request instead of every known player every time.
 - **Frontend** (`development/WebMod/bundle.js`): a plain script (no build step, no bundler) that
   registers React components under `window.UndeadLegacyPanels`, following the same plugin
   contract the stock dashboard already uses for other web mods.
