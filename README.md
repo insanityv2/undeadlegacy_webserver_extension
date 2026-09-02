@@ -12,12 +12,19 @@ it.
 
 ## Why this exists
 
-The stock dashboard's Map page and its supporting permission module are hardcoded to admin-only
-by default, and Undead Legacy's non-standard skill/research/perk-book systems aren't represented
-in the stock dashboard at all. Rather than patch the stock `TFP_MapRendering`/`TFP_WebServer`
-mods (which would mean every server admin re-applying the patch on every UL/dashboard update),
-this mod forks just the parts it needs - tile serving, not tile rendering - into its own
-routes, and adds new API endpoints for everything UL-specific.
+Undead Legacy replaces vanilla's skill system with its own classes, research tree, and perk
+books - none of which the stock dashboard knows anything about. On a shared server that makes a
+few everyday questions surprisingly hard to answer without asking in chat:
+
+- Has anyone already researched this, or am I about to duplicate their work?
+- Who on the server can pick locks, and how well?
+- What's everyone's build - who's running melee, who's the sniper, who mines?
+- Where is everyone right now, and where are the bases/outposts people have marked and shared?
+
+This mod answers those from the dashboard directly: the Player List panel turns "has anyone
+unlocked X" into a search box instead of a chat message, and the UL Map panel shows live player
+positions and shared waypoints with their real names and icons, all without needing anyone
+in-game to stop and answer.
 
 ## Panels
 
